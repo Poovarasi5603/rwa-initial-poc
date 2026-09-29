@@ -4,10 +4,30 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
+const { ethers } = require('ethers');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+const RPC_URL = process.env.RPC_URL || 'https://ethereum-rpc.publicnode.com';
+
+const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
+
+const USDC_ADDRESS = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48';
+
+const USDC_ABI = [
+  'function name() view returns (string)',
+  'function symbol() view returns (string)',
+  'function decimals() view returns (uint8)',
+  'function totalSupply() view returns (uint256)'
+];
+
+const usdcContract = new ethers.Contract(
+  USDC_ADDRESS,
+  USDC_ABI,
+  provider
+);
 
 // Security middleware
 app.use(helmet());
@@ -47,6 +67,36 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     version: '1.0.0'
   });
+});
+
+app.get('/api/PoovarasiApiTest', async (req, res) => {
+  try {
+    const [name, symbol, decimals, totalSupply] = await Promise.all([
+      usdcContract.name(),
+      usdcContract.symbol(),
+      usdcContract.decimals(),
+      usdcContract.totalSupply()
+    ]);
+
+    const result = {
+      contractAddress: USDC_ADDRESS,
+      name,
+      symbol,
+      decimals,
+      totalSupply: ethers.utils.formatUnits(totalSupply, decimals)
+    };
+
+    console.log('PoovarasiApiTest result:', result);
+
+    res.json(result);
+  } catch (error) {
+    console.error('PoovarasiApiTest error:', error.message);
+
+    res.status(500).json({
+      error: 'Failed to fetch smart contract data',
+      message: error.message
+    });
+  }
 });
 
 // Error handling middleware
